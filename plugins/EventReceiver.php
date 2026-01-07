@@ -29,6 +29,8 @@
  */
 function pluginEventReceiver_processEvent($eventType, $log): void {
 // intentionally left blank
+	error_log($log);
+	error_log("Send this log");
 }
 
 

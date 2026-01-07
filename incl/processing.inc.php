@@ -364,9 +364,11 @@ function processKnownBarcode(GrocyProduct $productInfo, string $barcode, bool $w
             if ($productInfo->stockAmount > 0) {
                 if ($productInfo->stockAmount < $amountToConsume)
                     $amountToConsume = $productInfo->stockAmount;
+		error_log("Inside the consuming");
                 $log    = new LogOutput("Consuming " . $amountToConsume . " " . $productInfo->unit . " of " . $productInfo->name, EVENT_TYPE_CONSUME_PRODUCT, $barcode);
                 $output = $log
                     ->addStockToText($productInfo->stockAmount - $amountToConsume)
+                    ->insertBarcodeInWebsocketText()
                     ->setWebsocketResultCode(WS_RESULT_PRODUCT_FOUND)
                     ->addProductFoundText()
                     ->createLog();
@@ -378,6 +380,7 @@ function processKnownBarcode(GrocyProduct $productInfo, string $barcode, bool $w
                 $log = new LogOutput("None in stock, not consuming: " . $productInfo->name, EVENT_TYPE_NO_STOCK, $barcode);
                 return $log
                     ->setWebsocketResultCode(WS_RESULT_PRODUCT_FOUND)
+                    ->insertBarcodeInWebsocketText()
                     ->addProductFoundText()
                     ->createLog();
             }
@@ -762,14 +765,16 @@ class LogOutput {
      * @param string|null $barcode
      * @param bool $isError
      */
-    function __construct(string $logText, int $eventType, string $barcode = null, bool $isError = false) {
+    function __construct(string $logText, int $eventType, ?string $barcode = null, bool $isError = false) {
         $this->logText       = $logText;
         $this->eventType     = $eventType;
         $this->websocketText = $logText;
         $this->barcode       = $barcode;
         $this->isError       = $isError;
 
-        if ($barcode != null)
+        error_log("TESTING");
+
+	if ($barcode != null)
             $this->logText .= " [$barcode]";
     }
 
@@ -844,6 +849,8 @@ class LogOutput {
         if ($this->sendWebsocketMessage) {
             SocketConnection::sendWebsocketMessage($this->websocketResultCode, $this->websocketText);
         }
+	error_log("Loaded Plugins");
+	var_dump("HERE");
         if (in_array("EventReceiver", $LOADED_PLUGINS)) {
             pluginEventReceiver_processEvent($this->eventType, $this->logText);
         }

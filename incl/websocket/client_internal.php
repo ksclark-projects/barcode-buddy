@@ -50,6 +50,7 @@ class SocketClient {
     }
 
     public function sendData(string $data): void {
+	error_log("Sending data: " . $data);
         socket_write($this->socket, $data, strlen($data));
     }
 

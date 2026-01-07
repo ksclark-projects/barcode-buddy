@@ -41,6 +41,7 @@ if (isset($argv[1]) && $argv[1] == "--benchmark") {
 
 //If arguments are passed with the CLI, parse them as barcode
 if (isset($argv[1])) {
+    error_log("Barcoess passed");
     processNewBarcode(sanitizeString($argv[1], true));
     die;
 }
@@ -265,8 +266,9 @@ function processButtons(): void {
                         if (!API::purchaseProduct($gidSelected, $amount, $row["bestBeforeInDays"], $row["price"])) {
                             $additionalLog = " [WARNING]: No default best before date set!";
                         }
-                        $log = new LogOutput("Adding $amount " . $product->unit . " of " . $product->name . $additionalLog, EVENT_TYPE_ADD_KNOWN_BARCODE);
-                        $log->setVerbose()->dontSendWebsocket()->createLog();
+			$log = new LogOutput("Adding $amount " . $product->unit . " of " . $product->name . $additionalLog, EVENT_TYPE_ADD_KNOWN_BARCODE, $barcode);
+			$log->insertBarcodeInWebsocketText();
+                        $log->setVerbose()->createLog();
                     }
                 }
             }
