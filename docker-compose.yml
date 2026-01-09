@@ -1,0 +1,16 @@
+services:
+  barcodebuddy:
+    image: f0rc3/barcodebuddy:latest
+    container_name: barcodebuddy
+    ports:
+      - "8000:80"
+      - "4433:443"
+    volumes:
+      - bbconfig:/config
+      - .:/app/bbuddy
+      - bb_git_null:/app/bbuddy/.git
+    restart: unless-stopped
+
+volumes:
+  bbconfig:
+  bb_git_null:

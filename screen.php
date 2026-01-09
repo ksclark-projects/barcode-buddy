@@ -51,129 +51,154 @@ $CONFIG->checkIfAuthenticated(true);
 
     <title>Barcode Buddy Screen</title>
     <style>
-        body,
-        html {
-            padding: 0;
+        * {
             margin: 0;
-            position: relative;
-            height: 100%
+            padding: 0;
+            box-sizing: border-box;
         }
 
+        body,
+        html {
+            position: relative;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #000;
+            color: #fff;
+        }
 
         .main-container {
             height: 100%;
             display: flex;
-            display: -webkit-flex;
             flex-direction: column;
-            -webkit-flex-direction: column;
-            -webkit-align-content: stretch;
-            align-content: stretch;
         }
 
         .header {
             width: 100%;
-            background: #ccc;
-            padding: 10px;
-            box-sizing: border-box;
-            text-transform: lowercase;
-            flex: 0 1 auto;
+            background: #000;
+            padding: 20px 24px;
+            border-bottom: 1px solid #333;
+            flex: 0 0 auto;
         }
 
         .content {
-            background: #eee;
+            background: #000;
             width: 100%;
-            padding: 10px;
-            flex: 1 0 auto;
-            box-sizing: border-box;
-            padding: 10px;
-            text-align: center;
-            align-content: center
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 24px 120px;
+            transition: background-color 0.4s ease;
         }
 
         .hdr-left {
-            text-align: center;
-            padding-left: 10px;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
         }
 
         .hdr-right {
             float: right;
-            width: 30%;
-            text-align: right;
-            padding-right: 10px
+            font-size: 14px;
+            color: #999;
+            font-weight: 400;
         }
 
-        #soundbuttondiv {
+        #soundbuttondiv, #backbuttondiv, #selectbuttondiv {
             position: fixed;
-            bottom: 10px;
-            right: 10px;
+            bottom: 24px;
+            z-index: 10;
         }
 
-        #backbuttondiv {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-        }
-
+        #soundbuttondiv { right: 24px; }
+        #backbuttondiv { left: 24px; }
         #selectbuttondiv {
-            position: fixed;
-            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
         }
 
         .h1 {
-            font: bold 4em arial;
-            margin: auto;
-            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin: 0;
         }
 
         .h2 {
-            font: bold 3em arial;
-            margin: auto;
-            padding: 10px;
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            margin: 0 0 16px;
             text-align: center;
+            line-height: 1.2;
         }
 
         .h3 {
-            font: bold 2em arial;
-            margin: auto;
-            padding: 10px;
+            font-size: 24px;
+            font-weight: 500;
+            margin: 16px 0;
             text-align: center;
+            color: #999;
         }
 
         .h4 {
-            font: bold 1.5em arial;
-            margin: auto;
-            padding: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 24px 0 12px;
+            color: #999;
         }
 
         .h5 {
-            font: bold 1em arial;
-            margin: auto;
-            text-align: center;
+            font-size: 14px;
+            font-weight: 400;
+            margin: 8px 0;
+            color: #666;
+            line-height: 1.6;
         }
 
         .bottom-button {
-            background-color: #31B0D5;
-            color: white;
-            padding: 1em 2em;
-            border-radius: 4px;
-            border-color: #46b8da;
+            background-color: #fff;
+            color: #000;
+            padding: 16px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(255,255,255,0.15);
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bottom-button:hover {
+            background-color: #f0f0f0;
+            transform: scale(1.05);
+        }
+
+        .bottom-button:active {
+            transform: scale(0.95);
         }
 
         .bottom-img {
-            height: 2.5em;
-            width: 2.5em;
+            height: 28px;
+            width: 28px;
+            filter: invert(1);
         }
 
-        @media only screen and (orientation: portrait)  not (display-mode: fullscreen) {
+        @media only screen and (orientation: portrait) {
             .bottom-button {
-                padding: 2em 4em;
+                width: 72px;
+                height: 72px;
             }
-
             .bottom-img {
-                height: 3em;
-                width: 3em;
+                height: 32px;
+                width: 32px;
+            }
+            .h2 {
+                font-size: 36px;
             }
         }
 
@@ -181,52 +206,77 @@ $CONFIG->checkIfAuthenticated(true);
             height: 0;
             width: 100%;
             position: fixed;
-            z-index: 1;
+            z-index: 100;
             bottom: 0;
             left: 0;
-            background-color: rgb(0, 0, 0);
-            background-color: rgba(0, 0, 0, 0.9);
-            overflow-x: hidden;
-            transition: 0.3s;
+            background-color: rgba(0, 0, 0, 0.98);
+            overflow: hidden;
+            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .overlay-content {
             position: relative;
-            top: 25%;
             width: 100%;
-            text-align: center;
-            margin-top: 30px;
+            max-width: 600px;
+            margin: 80px auto 0;
+            padding: 0 24px;
         }
 
         .overlay a {
-            padding: 8px;
+            padding: 20px 24px;
             text-decoration: none;
-            font-size: 36px;
-            color: #818181;
+            font-size: 20px;
+            font-weight: 500;
+            color: #fff;
             display: block;
-            transition: 0.2s;
+            transition: all 0.2s ease;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.05);
         }
 
-        .overlay a:hover, .overlay a:focus {
-            color: #f1f1f1;
+        .overlay a:hover,
+        .overlay a:active {
+            background: rgba(255,255,255,0.1);
+            transform: translateX(4px);
         }
 
         .overlay .closebtn {
             position: absolute;
-            top: 20px;
-            right: 45px;
-            font-size: 60px;
+            top: 24px;
+            right: 24px;
+            font-size: 48px;
+            background: none;
+            margin: 0;
+            padding: 8px 16px;
+            color: #fff;
+            border-radius: 50%;
+        }
+
+        .overlay .closebtn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        #log {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        #previous-events {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #333;
         }
 
         @media screen and (max-height: 450px) {
             .overlay a {
-                font-size: 20px
+                font-size: 16px;
+                padding: 12px 24px;
             }
-
             .overlay .closebtn {
-                font-size: 40px;
-                top: 15px;
-                right: 35px;
+                font-size: 36px;
+                top: 16px;
+                right: 16px;
             }
         }
     </style>
@@ -386,7 +436,7 @@ $CONFIG->checkIfAuthenticated(true);
         async function resetScan(scanId) {
             await sleep(3000);
             if (currentScanId == scanId) {
-                document.getElementById('content').style.backgroundColor = '#eee';
+                document.getElementById('content').style.backgroundColor = '#000000ff';
                 document.getElementById('scan-result').textContent = 'waiting for barcode...';
                 document.getElementById('event').textContent = '';
             }

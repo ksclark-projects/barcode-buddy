@@ -34,7 +34,7 @@ if (checkExtensionsInstalled()["result"] != RESULT_ALL_INSTALLED) {
     die("Not all required extensions are installed. Please run setup.php for more information.");
 }
 
-$address = '0.0.0.0';
+$address = '127.0.0.1';
 $port    = $CONFIG->PORT_WEBSOCKET_SERVER;
 
 echo "Starting socket server on $address:$port\n";
