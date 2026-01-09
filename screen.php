@@ -268,6 +268,85 @@ $CONFIG->checkIfAuthenticated(true);
             border-top: 1px solid #333;
         }
 
+        .create-form {
+            max-width: 500px;
+            margin: 32px auto 0;
+            text-align: left;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #999;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #333;
+            border-radius: 12px;
+            color: #fff;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.08);
+            border-color: #666;
+        }
+
+        .form-button {
+            width: 100%;
+            padding: 18px;
+            font-size: 16px;
+            font-weight: 600;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 16px;
+        }
+
+        .form-button:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+
+        .form-button:active {
+            transform: translateY(0);
+        }
+
+        .form-button.secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .form-button.secondary:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .unknown-badge {
+            display: inline-block;
+            background: rgba(234, 255, 138, 0.2);
+            color: #eaff8a;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 24px;
+        }
+
         @media screen and (max-height: 450px) {
             .overlay a {
                 font-size: 16px;
@@ -361,6 +440,153 @@ $CONFIG->checkIfAuthenticated(true);
     function sendQuantity() {
         var q = prompt('Enter quantity', '1');
         sendBarcode('<?php echo BBConfig::getInstance()["BARCODE_Q"] ?>' + q);
+    }
+
+    function buildProductFormHtml(barcode, locationOptions, storeOptions, quantityUnitOptions) {
+        return '<div class="unknown-badge">⚠️ Unknown Barcode</div>' +
+            '<div style="font-size: 32px; font-weight: 700; letter-spacing: -1px; margin-bottom: 24px; word-break: break-all;">' + barcode + '</div>' +
+            '<div class="create-form">' +
+            '  <div class="form-group">' +
+            '    <label class="form-label" for="product-name">Name</label>' +
+            '    <input type="text" id="product-name" class="form-input" placeholder="Enter product name" autofocus>' +
+            '  </div>' +
+            '  <div class="form-group">' +
+            '    <label class="form-label" for="default-location">Default Location</label>' +
+            '    ' + locationOptions +
+            '  </div>' +
+            '  <div class="form-group">' +
+            '    <label class="form-label" for="default-store">Default Store</label>' +
+            '    ' + storeOptions +
+            '  </div>' +
+            '  <div class="form-group">' +
+            '    <label class="form-label" for="quantity-unit-stock">Quantity Unit Stock</label>' +
+            '    ' + quantityUnitOptions.stock +
+            '  </div>' +
+            '  <button class="form-button" onclick="submitProduct(\'' + barcode + '\')">' +
+            '    Create Product' +
+            '  </button>' +
+            '  <button class="form-button secondary" onclick="cancelCreate()">' +
+            '    Cancel' +
+            '  </button>' +
+            '</div>';
+    }
+
+    function showUnknownBarcodeForm(barcode) {
+        document.getElementById('content').style.backgroundColor = '#eaff8a';
+        document.getElementById('beep_nosuccess').play();
+        document.getElementById('log').style.display = 'none';
+        
+        // Fetch locations, stores, and quantity units from API
+        Promise.all([
+            fetch('http://localhost:5002/api/v1/locations').then(r => r.json()),
+            fetch('http://localhost:5002/api/v1/stores').then(r => r.json()),
+            fetch('http://localhost:5002/api/v1/quantity-units').then(r => r.json())
+        ])
+            .then(([locationsResult, storesResult, quantityUnitsResult]) => {
+                var locations = locationsResult.data || [];
+                var locationOptions = '<select id="default-location" class="form-input"><option value="">Select location</option>';
+                locations.forEach(function(loc) {
+                    locationOptions += '<option value="' + loc.name + '">' + loc.name + '</option>';
+                });
+                locationOptions += '</select>';
+                
+                var stores = storesResult.data || [];
+                var storeOptions = '<select id="default-store" class="form-input"><option value="">Select store</option>';
+                stores.forEach(function(store) {
+                    storeOptions += '<option value="' + store.name + '">' + store.name + '</option>';
+                });
+                storeOptions += '</select>';
+                
+                var quantityUnits = quantityUnitsResult.data || [];
+                var stockUnitOptions = '<select id="quantity-unit-stock" class="form-input"><option value="">Select unit</option>';
+                var purchaseUnitOptions = '<select id="default-quantity-unit" class="form-input"><option value="">Select unit</option>';
+                quantityUnits.forEach(function(unit) {
+                    stockUnitOptions += '<option value="' + unit.name + '">' + unit.name + '</option>';
+                    purchaseUnitOptions += '<option value="' + unit.name + '">' + unit.name + '</option>';
+                });
+                stockUnitOptions += '</select>';
+                purchaseUnitOptions += '</select>';
+                
+                var quantityUnitOptions = {
+                    stock: stockUnitOptions,
+                    purchase: purchaseUnitOptions
+                };
+                
+                document.getElementById('scan-result').innerHTML = buildProductFormHtml(barcode, locationOptions, storeOptions, quantityUnitOptions);
+            })
+            .catch(error => {
+                console.error('Failed to load form data:', error);
+                // Fallback to text inputs if API fails
+                var locationInput = '<input type="text" id="default-location" class="form-input" placeholder="Enter default location">';
+                var storeInput = '<input type="text" id="default-store" class="form-input" placeholder="Enter default store">';
+                var quantityUnitInputs = {
+                    stock: '<input type="text" id="quantity-unit-stock" class="form-input" placeholder="Enter quantity unit stock">',
+                    purchase: '<input type="text" id="default-quantity-unit" class="form-input" placeholder="Enter default quantity unit">'
+                };
+                document.getElementById('scan-result').innerHTML = buildProductFormHtml(barcode, locationInput, storeInput, quantityUnitInputs);
+            });
+        
+    }
+
+    function submitProduct(barcode) {
+        var productName = document.getElementById('product-name').value;
+        var defaultLocation = document.getElementById('default-location').value;
+        var defaultStore = document.getElementById('default-store').value;
+        var quantityUnitStock = document.getElementById('quantity-unit-stock').value;
+        var defaultQuantityUnit = document.getElementById('default-quantity-unit').value;
+        
+        if (!productName) {
+            alert('Please enter a product name');
+            return;
+        }
+        
+        // Prepare data for API
+        var productData = {
+            barcode: barcode,
+            name: productName,
+            location_name: defaultLocation,
+            store_name: defaultStore,
+            qu_name_stock: quantityUnitStock,
+            qu_name_purchase: defaultQuantityUnit,
+            min_stock_amount: 1
+        };
+        
+        // Send to API
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://localhost:8080/api/product', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                // Success
+                document.getElementById('content').style.backgroundColor = '#33a532';
+                document.getElementById('scan-result').textContent = 'Product created: ' + productName;
+                document.getElementById('log').style.display = 'block';
+                
+                setTimeout(function() {
+                    cancelCreate();
+                }, 2000);
+            } else {
+                // Error
+                document.getElementById('content').style.backgroundColor = '#CC0605';
+                document.getElementById('scan-result').textContent = 'Error creating product: ' + xhr.statusText;
+                console.error('API Error:', xhr.responseText);
+            }
+        };
+        
+        xhr.onerror = function() {
+            document.getElementById('content').style.backgroundColor = '#CC0605';
+            document.getElementById('scan-result').textContent = 'Failed to connect to API';
+            console.error('Network error');
+        };
+        
+        xhr.send(JSON.stringify(productData));
+    }
+
+    function cancelCreate() {
+        document.getElementById('content').style.backgroundColor = '#000';
+        document.getElementById('scan-result').textContent = 'waiting for barcode...';
+        document.getElementById('log').style.display = 'block';
     }
 
     var noSleep = new NoSleep();
@@ -479,7 +705,7 @@ $CONFIG->checkIfAuthenticated(true);
                     resultScan("#a2ff9b", "Barcode Looked Up", he.decode(resultText), "beep_success");
                     break;
                 case '2':
-                    resultScan("#eaff8a", "Unknown Barcode", resultText, "beep_nosuccess");
+                    showUnknownBarcodeForm(resultText);
                     break;
                 case '4':
                     document.getElementById('mode').textContent = resultText;
