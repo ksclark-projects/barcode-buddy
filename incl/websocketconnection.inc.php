@@ -60,11 +60,12 @@ class SocketConnection {
     /**Send result of a barcode entry
      * @param int $resultValue
      * @param string $text
+     * @param int $eventType
      */
-    public static function sendWebsocketMessage(int $resultValue, string $text): void {
+    public static function sendWebsocketMessage(int $resultValue, string $text, int $eventType): void {
         $client = SocketConnection::getClient();
         if ($client->connect()) {
-            $client->sendData('2' . $resultValue . $text);
+            $client->sendData('2' . $resultValue . $text . $eventType);
             $client->close();
         }
     }

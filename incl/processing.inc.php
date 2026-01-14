@@ -218,7 +218,7 @@ function processUnknownBarcode(string $barcode, bool $websocketEnabled, LockGene
             $output = $log
                 ->insertBarcodeInWebsocketText()
                 ->setSendWebsocket($websocketEnabled)
-                ->setCustomWebsocketText($productname["name"])
+                ->setCustomWebsocketText($productname["name"] . " (" . $barcode . ")")
                 ->setWebsocketResultCode(WS_RESULT_PRODUCT_LOOKED_UP)
                 ->createLog();
         } else {
@@ -847,7 +847,7 @@ class LogOutput {
         $logText = str_replace('\n', " ", $this->logText);
         DatabaseConnection::getInstance()->saveLog($logText, $this->isVerbose, $this->isError);
         if ($this->sendWebsocketMessage) {
-            SocketConnection::sendWebsocketMessage($this->websocketResultCode, $this->websocketText);
+            SocketConnection::sendWebsocketMessage($this->websocketResultCode, $this->websocketText, $this->eventType);
         }
 	error_log("Loaded Plugins");
 	var_dump("HERE");

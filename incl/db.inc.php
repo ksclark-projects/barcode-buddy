@@ -606,6 +606,9 @@ class DatabaseConnection {
     }
 
 
+    public function deleteBarcodeByCode(string $barcode): void {
+        $this->db->exec("DELETE FROM Barcodes WHERE barcode='$barcode'");
+    }
     /**
      * Delete all saved barcodes
      *

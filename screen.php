@@ -17,10 +17,48 @@
 
 require_once __DIR__ . "/incl/configProcessing.inc.php";
 require_once __DIR__ . "/incl/config.inc.php";
+require_once __DIR__ . "/incl/db.inc.php";
 require_once __DIR__ . "/incl/redis.inc.php";
 
 $CONFIG->checkIfAuthenticated(true);
 
+// Initialize database connection
+$db = DatabaseConnection::getInstance();
+
+// Handle button press from JavaScript
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submitProduct') {
+    try {
+        $barcode = $_POST['barcode'] ?? '';
+        $process = ($_POST['process'] ?? 'false') === 'true';
+        $productName = $_POST['product_name'] ?? '';
+        $location = $_POST['location'] ?? '';
+        $store = $_POST['store'] ?? '';
+        
+        // Perform your PHP action here
+        error_log("Product submitted: $productName (barcode: $barcode, process: " . ($process ? 'true' : 'false') . ")");
+        
+        // Example: Delete barcode after processing
+        $db->deleteBarcodeByCode($barcode);
+        
+        // Example: Log to database
+        // $db->logProductSubmission($barcode, $productName, $process);
+        
+        // Example: Write to file
+        // file_put_contents(__DIR__ . '/logs/product_submissions.log', 
+        //     date('Y-m-d H:i:s') . " - $productName ($barcode) - Process: " . ($process ? 'Yes' : 'No') . "\n", 
+        //     FILE_APPEND);
+        
+        // Return success response
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'message' => 'PHP action completed']);
+    } catch (Exception $e) {
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        error_log("Error in submitProduct: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+    }
+    exit;
+}
 
 ?>
 <!DOCTYPE html>
@@ -48,6 +86,7 @@ $CONFIG->checkIfAuthenticated(true);
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#ccc">
 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <title>Barcode Buddy Screen</title>
     <style>
@@ -128,7 +167,7 @@ $CONFIG->checkIfAuthenticated(true);
         .h2 {
             font-size: 48px;
             font-weight: 700;
-            letter-spacing: -2px;
+            letter-spacing: 0px;
             margin: 0 0 16px;
             text-align: center;
             line-height: 1.2;
@@ -336,10 +375,70 @@ $CONFIG->checkIfAuthenticated(true);
             background: rgba(255,255,255,0.15);
         }
 
+        .form-input.error {
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+
+        .form-input.error:focus {
+            border-color: #ff6666;
+        }
+
+        /* Processing Animation */
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+
+        .processing-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 64px;
+            height: 64px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .processing-text {
+            margin-top: 24px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .unknown-badge-new-product {
+            display: inline-block;
+            background: hsla(156, 100%, 50%, 0.20);
+            color: #ffffffff;
+            padding: 16px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 24px;
+        }
+
         .unknown-badge {
             display: inline-block;
-            background: rgba(234, 255, 138, 0.2);
-            color: #eaff8a;
+            background: hsla(219, 100%, 70%, 0.20);
+            color: #ffffffff;
             padding: 8px 16px;
             border-radius: 20px;
             font-size: 14px;
@@ -358,6 +457,170 @@ $CONFIG->checkIfAuthenticated(true);
                 right: 16px;
             }
         }
+
+        /* Amazon Lookup Modal */
+        .amazon-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 24px;
+        }
+
+        .amazon-modal.active {
+            display: flex;
+        }
+
+        .amazon-modal-content {
+            background: #1a1a1a;
+            border-radius: 16px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+        }
+
+        .amazon-modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .amazon-modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin: 0;
+        }
+
+        .amazon-modal-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .amazon-modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .amazon-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .amazon-product {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .amazon-product:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .amazon-select-button {
+            padding: 12px 24px;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            align-self: center;
+        }
+
+        .amazon-select-button:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+
+        .amazon-select-button:active {
+            transform: scale(0.95);
+        }
+
+        .amazon-product-image {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: #fff;
+            padding: 8px;
+            flex-shrink: 0;
+        }
+
+        .amazon-product-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .amazon-product-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .amazon-product-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: #4CAF50;
+            margin-bottom: 4px;
+        }
+
+        .amazon-product-rating {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .amazon-loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .amazon-error {
+            text-align: center;
+            padding: 40px;
+            color: #ff4444;
+        }
+
+        .amazon-no-results {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
     </style>
 
 </head>
@@ -366,6 +629,10 @@ $CONFIG->checkIfAuthenticated(true);
 <script src="./incl/js/he.js"></script>
 
 <div class="main-container">
+    <div id="processing-overlay" class="processing-overlay">
+        <div class="spinner"></div>
+        <div class="processing-text">Processing product, please wait...</div>
+    </div>
     <div id="header" class="header">
     <span class="hdr-right h4">
       Status: <span id="grocy-sse">Connecting...</span><br>
@@ -381,6 +648,19 @@ $CONFIG->checkIfAuthenticated(true);
                 <p class="h4 p-t10"> previous scans: </p>
                 <span id="log-entries" class="h5"></span>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Amazon Lookup Modal -->
+<div id="amazon-modal" class="amazon-modal">
+    <div class="amazon-modal-content">
+        <div class="amazon-modal-header">
+            <h2 class="amazon-modal-title">Amazon Product Search</h2>
+            <button class="amazon-modal-close" onclick="closeAmazonModal()">&times;</button>
+        </div>
+        <div id="amazon-modal-body" class="amazon-modal-body">
+            <div class="amazon-loading">Loading products...</div>
         </div>
     </div>
 </div>
@@ -421,6 +701,8 @@ $CONFIG->checkIfAuthenticated(true);
 </div>
 
 <script>
+    // API Base URL - change this to match your API server
+    const baseUrl = 'http://localhost:5002';
 
     function openNav() {
         document.getElementById("myNav").style.height = "100%";
@@ -442,13 +724,21 @@ $CONFIG->checkIfAuthenticated(true);
         sendBarcode('<?php echo BBConfig::getInstance()["BARCODE_Q"] ?>' + q);
     }
 
-    function buildProductFormHtml(barcode, locationOptions, storeOptions, quantityUnitOptions) {
-        return '<div class="unknown-badge">⚠️ Unknown Barcode</div>' +
-            '<div style="font-size: 32px; font-weight: 700; letter-spacing: -1px; margin-bottom: 24px; word-break: break-all;">' + barcode + '</div>' +
+    function buildProductFormHtml(barcode, locationOptions, storeOptions, quantityUnitOptions, productName='') {
+        var badge = productName 
+            ? '<div id="title-badge" class="unknown-badge-new-product"><i class="fas fa-tag"></i> New Product</div>'
+            : '<div id="title-badge" class="unknown-badge"><i class="fas fa-exclamation-triangle"></i> Unknown Barcode</div>';
+        
+        return badge +
+            '<div style="font-size: 32px; font-weight: 700; letter-spacing: -1px; margin-bottom: 24px; word-break: break-all;">' + he.encode(productName) + ' (' + he.encode(barcode) + ')</div>' +
             '<div class="create-form">' +
             '  <div class="form-group">' +
             '    <label class="form-label" for="product-name">Name</label>' +
-            '    <input type="text" id="product-name" class="form-input" placeholder="Enter product name" autofocus>' +
+            '    <input type="text" id="product-name" class="form-input" placeholder="Enter product name" value="' + he.encode(productName) + '" autofocus>' +
+            '  </div>' +
+            '  <div class="form-group">' +
+            '    <label class="form-label" for="product-asin">ASIN</label>' +
+            '    <input type="text" id="product-asin" class="form-input" placeholder="Amazon ASIN" value="">' +
             '  </div>' +
             '  <div class="form-group">' +
             '    <label class="form-label" for="default-location">Default Location</label>' +
@@ -462,8 +752,14 @@ $CONFIG->checkIfAuthenticated(true);
             '    <label class="form-label" for="quantity-unit-stock">Quantity Unit Stock</label>' +
             '    ' + quantityUnitOptions.stock +
             '  </div>' +
+            '  <button class="form-button" onclick="submitProduct(\'' + barcode + '\', true)">' +
+            '    Lookups & Process Product' +
+            '  </button>' +
             '  <button class="form-button" onclick="submitProduct(\'' + barcode + '\')">' +
             '    Create Product' +
+            '  </button>' +
+            '  <button class="form-button" onclick="openAmazonLookup(\'' + barcode + '\')">' +
+            '    Amazon Lookup' +
             '  </button>' +
             '  <button class="form-button secondary" onclick="cancelCreate()">' +
             '    Cancel' +
@@ -471,16 +767,19 @@ $CONFIG->checkIfAuthenticated(true);
             '</div>';
     }
 
-    function showUnknownBarcodeForm(barcode) {
-        document.getElementById('content').style.backgroundColor = '#eaff8a';
-        document.getElementById('beep_nosuccess').play();
+    function showUnknownBarcodeForm(res, productName, barcode) {
+        document.getElementById('content').style.backgroundColor = '#000';
+        // document.getElementById('beep_nosuccess').play();
         document.getElementById('log').style.display = 'none';
         
+        // if the productName is available use it to prefill the product name field
+        var prefillName = productName ? he.decode(productName) : '';
+
         // Fetch locations, stores, and quantity units from API
         Promise.all([
-            fetch('http://localhost:5002/api/v1/locations').then(r => r.json()),
-            fetch('http://localhost:5002/api/v1/stores').then(r => r.json()),
-            fetch('http://localhost:5002/api/v1/quantity-units').then(r => r.json())
+            fetch(baseUrl + '/api/v1/locations').then(r => r.json()),
+            fetch(baseUrl + '/api/v1/stores').then(r => r.json()),
+            fetch(baseUrl + '/api/v1/quantity-units').then(r => r.json())
         ])
             .then(([locationsResult, storesResult, quantityUnitsResult]) => {
                 var locations = locationsResult.data || [];
@@ -512,7 +811,12 @@ $CONFIG->checkIfAuthenticated(true);
                     purchase: purchaseUnitOptions
                 };
                 
-                document.getElementById('scan-result').innerHTML = buildProductFormHtml(barcode, locationOptions, storeOptions, quantityUnitOptions);
+                document.getElementById('scan-result').innerHTML = buildProductFormHtml(barcode, locationOptions, storeOptions, quantityUnitOptions, prefillName);
+                
+                // Set the product name value if available
+                if (prefillName) {
+                    document.getElementById('product-name').value = prefillName;
+                }
             })
             .catch(error => {
                 console.error('Failed to load form data:', error);
@@ -524,19 +828,50 @@ $CONFIG->checkIfAuthenticated(true);
                     purchase: '<input type="text" id="default-quantity-unit" class="form-input" placeholder="Enter default quantity unit">'
                 };
                 document.getElementById('scan-result').innerHTML = buildProductFormHtml(barcode, locationInput, storeInput, quantityUnitInputs);
+                
+                // Set the product name value if available
+                if (prefillName) {
+                    document.getElementById('product-name').value = prefillName;
+                }
             });
         
     }
 
-    function submitProduct(barcode) {
+    function submitProduct(barcode,process=false) {
         var productName = document.getElementById('product-name').value;
         var defaultLocation = document.getElementById('default-location').value;
         var defaultStore = document.getElementById('default-store').value;
         var quantityUnitStock = document.getElementById('quantity-unit-stock').value;
-        var defaultQuantityUnit = document.getElementById('default-quantity-unit').value;
+
+        // Clear all previous errors
+        document.querySelectorAll('.form-input').forEach(function(el) {
+            el.classList.remove('error');
+        });
+        
+        // Validate required fields
+        var hasError = false;
         
         if (!productName) {
-            alert('Please enter a product name');
+            document.getElementById('product-name').classList.add('error');
+            hasError = true;
+        }
+        
+        if (!defaultLocation) {
+            document.getElementById('default-location').classList.add('error');
+            hasError = true;
+        }
+        
+        if (!defaultStore) {
+            document.getElementById('default-store').classList.add('error');
+            hasError = true;
+        }
+        
+        if (!quantityUnitStock) {
+            document.getElementById('quantity-unit-stock').classList.add('error');
+            hasError = true;
+        }
+        
+        if (hasError) {
             return;
         }
         
@@ -547,25 +882,44 @@ $CONFIG->checkIfAuthenticated(true);
             location_name: defaultLocation,
             store_name: defaultStore,
             qu_name_stock: quantityUnitStock,
-            qu_name_purchase: defaultQuantityUnit,
+            qu_name_purchase: quantityUnitStock,
             min_stock_amount: 1
         };
+
+        console.log('Submitting product data:', productData);
+        
+        // Show processing animation if process=true
+        if (process) {
+            document.getElementById('processing-overlay').classList.add('active');
+        }
         
         // Send to API
         var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:8080/api/product', true);
+        
+        if (process) {
+        xhr.open('POST', baseUrl + '/api/v1/product/process', true);
+
+        }else{
+        xhr.open('POST', baseUrl + '/api/v1/product', true);
+
+        }
         xhr.setRequestHeader('Content-Type', 'application/json');
         
         xhr.onload = function() {
+            // Hide processing overlay
+            document.getElementById('processing-overlay').classList.remove('active');
+            
             if (xhr.status >= 200 && xhr.status < 300) {
                 // Success
                 document.getElementById('content').style.backgroundColor = '#33a532';
                 document.getElementById('scan-result').textContent = 'Product created: ' + productName;
                 document.getElementById('log').style.display = 'block';
+                // $db->deleteBarcode(barcode);
+    
                 
                 setTimeout(function() {
                     cancelCreate();
-                }, 2000);
+                }, 4000);
             } else {
                 // Error
                 document.getElementById('content').style.backgroundColor = '#CC0605';
@@ -575,18 +929,163 @@ $CONFIG->checkIfAuthenticated(true);
         };
         
         xhr.onerror = function() {
+            // Hide processing overlay
+            document.getElementById('processing-overlay').classList.remove('active');
+            
             document.getElementById('content').style.backgroundColor = '#CC0605';
             document.getElementById('scan-result').textContent = 'Failed to connect to API';
             console.error('Network error');
         };
         
         xhr.send(JSON.stringify(productData));
+        
+        // ALSO send to PHP handler for server-side action
+        console.log("sending to PHP handler");
+        var phpXhr = new XMLHttpRequest();
+        phpXhr.open('POST', 'screen.php', true);
+        phpXhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        phpXhr.onload = function() {
+            if (phpXhr.status === 200) {
+                console.log('PHP action completed:', phpXhr.responseText);
+            } else {
+                console.error('PHP handler error (status ' + phpXhr.status + '):', phpXhr.responseText);
+                try {
+                    var errorData = JSON.parse(phpXhr.responseText);
+                    console.error('Error details:', errorData);
+                } catch(e) {
+                    console.error('Raw response:', phpXhr.responseText);
+                }
+            }
+        };
+        phpXhr.onerror = function() {
+            console.error('PHP handler network error');
+        };
+        phpXhr.send(
+            'action=submitProduct&' +
+            'barcode=' + encodeURIComponent(barcode) + '&' +
+            'process=' + (process ? 'true' : 'false') + '&' +
+            'product_name=' + encodeURIComponent(productName) + '&' +
+            'location=' + encodeURIComponent(defaultLocation) + '&' +
+            'store=' + encodeURIComponent(defaultStore)
+        );
     }
 
     function cancelCreate() {
         document.getElementById('content').style.backgroundColor = '#000';
         document.getElementById('scan-result').textContent = 'waiting for barcode...';
         document.getElementById('log').style.display = 'block';
+    }
+
+    // Amazon Lookup Functions
+    function openAmazonLookup(barcode) {
+        var productName = document.getElementById('product-name').value;
+        var searchQuery = productName || barcode;
+        
+        // Open modal
+        document.getElementById('amazon-modal').classList.add('active');
+        
+        // Show loading state
+        document.getElementById('amazon-modal-body').innerHTML = '<div class="amazon-loading"><div class="spinner"></div><p style="margin-top: 16px;">Searching Amazon for "' + he.encode(searchQuery) + '"...</p></div>';
+        
+        // Mock API response - simulate network delay
+        setTimeout(function() {
+            var mockData = {
+                products: [
+                    {
+                        asin: "B08N5WRWNW",
+                        name: "Echo Dot (4th Gen) | Smart speaker with Alexa",
+                        price: "$49.99",
+                        url: "https://www.amazon.com/dp/B08N5WRWNW",
+                        image: "https://m.media-amazon.com/images/I/61V-RYl7ZOL._AC_SL1000_.jpg"
+                    },
+                    {
+                        asin: "B09B8V1LZ3",
+                        name: "Amazon Basics AAA Performance Alkaline Batteries (36 Count)",
+                        price: "$14.99",
+                        url: "https://www.amazon.com/dp/B09B8V1LZ3",
+                        image: "https://m.media-amazon.com/images/I/71nDX36Y9VL._AC_SL1500_.jpg"
+                    },
+                    {
+                        asin: "B0B7RXZM1T",
+                        name: "Fire TV Stick 4K Max streaming device",
+                        price: "$54.99",
+                        url: "https://www.amazon.com/dp/B0B7RXZM1T",
+                        image: "https://m.media-amazon.com/images/I/51TjJOTfslL._AC_SL1000_.jpg"
+                    },
+                    {
+                        asin: "B07XJ8C8F5",
+                        name: "Echo Show 8 (2nd Gen) | HD smart display with Alexa",
+                        price: "$129.99",
+                        url: "https://www.amazon.com/dp/B07XJ8C8F5",
+                        image: "https://m.media-amazon.com/images/I/51uVqzPC6qL._AC_SL1000_.jpg"
+                    },
+                    {
+                        asin: "B09B93ZDG4",
+                        name: "Kindle Paperwhite (16 GB) - Now with a 6.8 display",
+                        price: "$139.99",
+                        url: "https://www.amazon.com/dp/B09B93ZDG4",
+                        image: "https://m.media-amazon.com/images/I/51QCk82iGcL._AC_SL1000_.jpg"
+                    }
+                ]
+            };
+            
+            displayAmazonResults(mockData, barcode);
+        }, 800); // Simulate 800ms API delay
+    }
+
+    function displayAmazonResults(data, barcode) {
+        var modalBody = document.getElementById('amazon-modal-body');
+        
+        // Check if we have products
+        if (!data.products || data.products.length === 0) {
+            modalBody.innerHTML = 
+                '<div class="amazon-no-results">' +
+                '<i class="fas fa-search" style="font-size: 48px; margin-bottom: 16px;"></i>' +
+                '<p style="font-size: 18px;">No products found</p>' +
+                '<p style="font-size: 14px; margin-top: 8px;">Try adjusting your search terms</p>' +
+                '</div>';
+            return;
+        }
+        
+        // Build products HTML
+        var html = '';
+        data.products.forEach(function(product) {
+            var name = product.name || 'Unknown Product';
+            var price = product.price || 'Price not available';
+            var asin = product.asin || '';
+            var url = product.url || '';
+            var image = product.image || '';
+            
+            html += 
+                '<div class="amazon-product">' +
+                '  <img class="amazon-product-image" src="' + he.encode(image) + '" alt="' + he.encode(name) + '" onerror="this.style.display=\'none\'">' +
+                '  <div class="amazon-product-info">' +
+                '    <div class="amazon-product-title">' + he.encode(name) + '</div>' +
+                '    <div class="amazon-product-price">' + he.encode(price) + '</div>' +
+                '    <div class="amazon-product-rating"><i class="fas fa-external-link-alt"></i> View on Amazon</div>' +
+                '  </div>' +
+                '  <button class="amazon-select-button" onclick="selectAmazonProduct(\'' + he.encode(asin) + '\', \'' + he.encode(name) + '\', \'' + he.encode(url) + '\', \'' + barcode + '\')">' +
+                '    Select' +
+                '  </button>' +
+                '</div>';
+        });
+        
+        modalBody.innerHTML = html;
+    }
+
+    function selectAmazonProduct(asin, name, url, barcode) {
+        // Pre-fill the ASIN field
+        document.getElementById('product-asin').value = he.decode(asin);
+        
+        // Close the modal
+        closeAmazonModal();
+        
+        // Optional: You could also store the ASIN and URL for future reference
+        console.log('Selected Amazon product:', { asin: asin, name: name, url: url, barcode: barcode });
+    }
+
+    function closeAmazonModal() {
+        document.getElementById('amazon-modal').classList.remove('active');
     }
 
     var noSleep = new NoSleep();
@@ -676,7 +1175,7 @@ $CONFIG->checkIfAuthenticated(true);
             document.getElementById('content').style.backgroundColor = color;
             document.getElementById('event').textContent = message;
             document.getElementById('scan-result').textContent = text;
-            document.getElementById(sound).play();
+            // document.getElementById(sound).play();
             document.getElementById('log-entries').innerText = '\r\n' + text + document.getElementById('log-entries').innerText;
             currentScanId++;
             resetScan(currentScanId);
@@ -695,14 +1194,47 @@ $CONFIG->checkIfAuthenticated(true);
 
         source.onmessage = function (event) {
             var resultJson = JSON.parse(event.data);
+            
             var resultCode = resultJson.data.substring(0, 1);
-            var resultText = resultJson.data.substring(1);
+            var resultText = resultJson.data.substring(1, resultJson.data.length);
+            // // if the eventtype is 8 the barcode is between ( and ) at the end of the string
+            // var resultText = resultJson.data.substring(1, resultJson.data.length - 1);
+
+            // var barcodeMatch = resultText.match(/\(([^)]+)\)$/);
+            // var barcode = barcodeMatch ? barcodeMatch[1] : null;
+            // // Remove the barcode and parentheses from resultText
+            // var productName = resultText.replace(/\s*\([^)]+\)$/, '');
+            // Extract eventType from resultJson, it is the last character if it is an integer
+            var eventType = parseInt(resultJson.data.slice(-1));
+
+            console.log("Result Code:", resultCode);
             switch (resultCode) {
                 case '0':
+                    resultText = resultJson.data.substring(1, resultJson.data.length - 1);
                     resultScan("#33a532", "", he.decode(resultText), "beep_success");
                     break;
                 case '1':
-                    resultScan("#a2ff9b", "Barcode Looked Up", he.decode(resultText), "beep_success");
+                    if (eventType == 20) {
+                        // Unknown product already scanned , increasing inventory
+
+                    }
+                    if (eventType == 8) {
+                        // EVENT_TYPE_ADD_NEW_BARCODE 
+                        // Prefill the title
+                        resultText = resultJson.data.substring(1, resultJson.data.length - 1);
+
+                        var barcodeMatch = resultText.match(/\(([^)]+)\)$/);
+                        var barcode = barcodeMatch ? barcodeMatch[1] : null;
+                        // Remove the barcode and parentheses from resultText
+                        var productName = resultText.replace(/\s*\([^)]+\)$/, '');
+                        // resultText = resultJson.data.substring(1, resultJson.data.length - 1);
+                        console.log("resultText for new barcode:", resultText);
+                        console.log("the product name is:", productName);
+                        console.log("barcode for new product form:", barcode);
+                        showUnknownBarcodeForm(resultText, productName, barcode);
+                    }else{
+                        resultScan("#a2ff9b", "Barcode Looked Up", he.decode(resultText), "beep_success");
+                    }
                     break;
                 case '2':
                     showUnknownBarcodeForm(resultText);
