@@ -1,5 +1,5 @@
 // API Base URL - change this to match your API server
-const baseUrl = "http://localhost:5002";
+const baseUrl = "http://192.168.0.234:5002";
 
 // API Endpoints
 const API_ENDPOINTS = {
