@@ -387,6 +387,8 @@ function openAmazonLookup(barcode) {
   modalBody.appendChild(loadingClone);
 
   // Make API call to lookup Amazon products
+
+  console.log("Looking up Amazon products for barcode:", barcode);
   fetch(
     baseUrl +
       API_ENDPOINTS.AMAZON_LOOKUP +
