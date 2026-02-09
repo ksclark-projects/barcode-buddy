@@ -59,6 +59,7 @@ function createConfigPhp(string $configPath): void {
 function checkForMissingConstants(): void {
     $defaultValues = array(
         "PORT_WEBSOCKET_SERVER"        => 47631,
+        "GROCERY_API_URL"              => "http://192.168.0.234:5002",
         "DATABASE_PATH"                => __DIR__ . '/../data/barcodebuddy.db',
         "CONFIG_PATH"                  => CONFIG_PATH,
         "AUTHDB_PATH"                  => AUTHDB_PATH,
@@ -107,6 +108,7 @@ class GlobalConfig {
     public $SEARCH_ENGINE = SEARCH_ENGINE;
     public $BASEURL = BASEURL;
     public $DEFAULT_LOOKUP_LANGUAGE = DEFAULT_LOOKUP_LANGUAGE;
+    public $GROCERY_API_URL = GROCERY_API_URL;
 
     function __construct() {
         $this->loadConfig();

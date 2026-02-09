@@ -91,10 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     <title>Barcode Buddy Screen</title>
 
+    <script>
+        window.__CONFIG__ = {
+        API_BASE_URL: <?= json_encode($CONFIG->GROCERY_API_URL) ?>
+        };
+    </script>    
+
 </head>
 <body>
 <script src="./incl/js/nosleep.min.js"></script>
 <script src="./incl/js/he.js"></script>
+<script src="./static/js/config.js"></script>
 <script src="./static/js/screen.js"></script>
 
 <div class="main-container">

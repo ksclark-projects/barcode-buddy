@@ -1,5 +1,6 @@
 // API Base URL - change this to match your API server
-const baseUrl = "http://192.168.0.234:5002";
+const baseUrl = window.__CONFIG__.GROCERY_API_URL;
+console.log("API:", baseUrl);
 
 // API Endpoints
 const API_ENDPOINTS = {
